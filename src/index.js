@@ -5,9 +5,20 @@ import { verifyGoogleToken } from './auth.js';
 import recordsRouter from './routes/records.js';
 import exchangesRouter from './routes/exchanges.js';
 import balanceRouter from './routes/balance.js';
+import authRouter from './routes/auth.js';
 
 const app = express();
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({
+  origin: [
+    'http://127.0.0.1:5500',
+    'http://localhost:5500',
+    'http://localhost:3000'
+  ],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+app.options('*', cors());
 app.use(express.json());
 
 app.get('/', (req, res) => {
@@ -27,6 +38,7 @@ app.post('/auth/google', async (req, res) => {
   }
 });
 
+app.use('/auth', authRouter);
 app.use('/records', recordsRouter);
 app.use('/exchanges', exchangesRouter);
 app.use('/balance', balanceRouter);
