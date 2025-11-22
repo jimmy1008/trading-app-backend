@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { verifyGoogleToken } from './auth.js';
 import recordsRouter from './routes/records.js';
 import exchangesRouter from './routes/exchanges.js';
 import balanceRouter from './routes/balance.js';
@@ -30,19 +29,6 @@ app.use(express.json());
 
 app.get('/', (req, res) => {
   res.json({ ok: true });
-});
-
-app.post('/auth/google', async (req, res) => {
-  try {
-    const { idToken } = req.body;
-    if (!idToken) return res.status(400).json({ error: 'Missing idToken' });
-
-    const data = await verifyGoogleToken(idToken);
-    res.json(data);
-  } catch (err) {
-    console.error(err);
-    res.status(401).json({ error: 'Invalid Google token' });
-  }
 });
 
 app.use('/auth', authRouter);

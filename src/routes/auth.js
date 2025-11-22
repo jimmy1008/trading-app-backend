@@ -60,6 +60,53 @@ router.post('/register', async (req, res) => {
   }
 });
 
+router.post('/google', async (req, res) => {
+  try {
+    const { credential } = req.body || {};
+
+    if (!credential) {
+      return res.status(400).json({ error: 'missing_credential' });
+    }
+
+    const payload = JSON.parse(
+      Buffer.from(credential.split('.')[1], 'base64').toString()
+    );
+
+    const googleSub = payload.sub;
+    const email = payload.email;
+    const username = payload.name || payload.email?.split('@')[0];
+    const avatar = payload.picture;
+    const displayName = payload.name;
+
+    if (!googleSub || !email) {
+      return res.status(400).json({ error: 'invalid_google_payload' });
+    }
+
+    const exist = await pool.query(
+      'SELECT * FROM users WHERE google_sub = $1 OR email = $2 LIMIT 1',
+      [googleSub, email]
+    );
+
+    let user = exist.rows[0];
+
+    if (!user) {
+      const insert = await pool.query(
+        `INSERT INTO users (username, email, google_sub, display_name, avatar_url, password_hash)
+         VALUES ($1, $2, $3, $4, $5, NULL)
+         RETURNING id, username, email, gender, google_sub`,
+        [username, email, googleSub, displayName, avatar]
+      );
+      user = insert.rows[0];
+    }
+
+    const token = createTokenFor(user);
+    res.json({ token, user });
+  } catch (err) {
+    console.error('google_error', err);
+    res.status(500).json({ error: 'google_error', detail: err.message });
+  }
+});
+
 router.post('/login', async (req, res) => {
   try {
     const { username, email, password } = req.body || {};
