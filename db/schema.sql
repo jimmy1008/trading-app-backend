@@ -4,6 +4,10 @@ CREATE TABLE users (
   email VARCHAR(255) NOT NULL,
   display_name VARCHAR(255),
   avatar_url TEXT,
+  username VARCHAR(255),
+  password_hash TEXT,
+  gender VARCHAR(64),
+  invite_code VARCHAR(255),
   created_at TIMESTAMP DEFAULT NOW()
 );
 

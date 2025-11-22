@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { pool } from '../db.js';
 
 const router = express.Router();
@@ -47,6 +48,92 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   return res.status(501).json({ error: 'login_not_implemented' });
 });
+
+
+// Local register
+router.post('/register', async (req, res) => {
+  try {
+    const { username, email, password, gender, inviteCode } = req.body || {};
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'missing_fields' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'password_too_short' });
+    }
+
+    const existingEmail = await pool.query('SELECT id FROM users WHERE email = ', [email]);
+    if (existingEmail.rows.length) {
+      return res.status(400).json({ error: 'email_exists' });
+    }
+
+    const existingUsername = await pool.query('SELECT id FROM users WHERE username = ', [username]);
+    if (existingUsername.rows.length) {
+      return res.status(400).json({ error: 'username_exists' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const googleSub = local:;
+
+    const inserted = await pool.query(
+      INSERT INTO users (username, email, password_hash, google_sub, gender, invite_code)
+       VALUES (, , , , , )
+       RETURNING *,
+      [username, email, passwordHash, googleSub, gender || null, inviteCode || null]
+    );
+
+    const user = inserted.rows[0];
+    const token = createTokenFor(user);
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        gender: user.gender
+      }
+    });
+  } catch (err) {
+    console.error('register error', err);
+    return res.status(500).json({ error: 'register_error' });
+  }
+});
+
+// Local login
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ error: 'missing_fields' });
+    }
+
+    const result = await pool.query('SELECT * FROM users WHERE email = ', [email]);
+    const user = result.rows[0];
+    if (!user) return res.status(400).json({ error: 'invalid_credentials' });
+
+    if (!user.password_hash) {
+      return res.status(400).json({ error: 'google_only_account' });
+    }
+
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) return res.status(400).json({ error: 'invalid_credentials' });
+
+    const token = createTokenFor(user);
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        gender: user.gender
+      }
+    });
+  } catch (err) {
+    console.error('login error', err);
+    return res.status(500).json({ error: 'login_error' });
+  }
+});
+
 
 // Telegram Login callback (Widget auth_url)
 router.get('/telegram', async (req, res) => {
