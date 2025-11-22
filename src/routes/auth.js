@@ -55,8 +55,8 @@ router.post('/register', async (req, res) => {
     const token = createTokenFor(user);
     res.json({ token, user });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'register_error' });
+    console.error('register_error', err);
+    res.status(500).json({ error: 'register_error', detail: err.message });
   }
 });
 
@@ -93,8 +93,8 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'login_error' });
+    console.error('login_error', err);
+    res.status(500).json({ error: 'login_error', detail: err.message });
   }
 });
 

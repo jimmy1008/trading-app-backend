@@ -11,6 +11,15 @@ CREATE TABLE users (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Fallback for existing databases: ensure new columns exist
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS username VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS password_hash TEXT,
+  ADD COLUMN IF NOT EXISTS gender VARCHAR(64),
+  ADD COLUMN IF NOT EXISTS invite_code VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS avatar_url TEXT,
+  ADD COLUMN IF NOT EXISTS display_name VARCHAR(255);
+
 CREATE TABLE trade_records (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
