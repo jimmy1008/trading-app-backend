@@ -10,9 +10,9 @@ import authRouter from './routes/auth.js';
 const app = express();
 app.use(cors({
   origin: [
-    'http://127.0.0.1:5500',
-    'http://localhost:5500',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'https://y1ran.app',
+    'https://www.y1ran.app'
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

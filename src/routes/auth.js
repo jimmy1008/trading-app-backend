@@ -7,7 +7,7 @@ const router = express.Router();
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const JWT_SECRET = process.env.JWT_SECRET;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5500/frontend';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://y1ran.app';
 const TELEGRAM_LOGIN_MAX_AGE = Number(process.env.TELEGRAM_LOGIN_MAX_AGE || 86400);
 
 const SECRET = TELEGRAM_BOT_TOKEN
