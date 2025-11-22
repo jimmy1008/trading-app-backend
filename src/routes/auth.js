@@ -1,56 +1,19 @@
 import express from 'express';
-import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { pool } from '../db.js';
 
 const router = express.Router();
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const JWT_SECRET = process.env.JWT_SECRET;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://y1ran.app';
-const TELEGRAM_LOGIN_MAX_AGE = Number(process.env.TELEGRAM_LOGIN_MAX_AGE || 86400);
-
-const SECRET = TELEGRAM_BOT_TOKEN
-  ? crypto.createHash('sha256').update(TELEGRAM_BOT_TOKEN).digest()
-  : null;
-
-function checkTelegramAuth(data = {}) {
-  if (!SECRET) return false;
-  const { hash, ...rest } = data;
-  if (!hash) return false;
-  const checkString = Object.keys(rest)
-    .sort()
-    .map(key => `${key}=${rest[key]}`)
-    .join('\n');
-
-  const hmac = crypto.createHmac('sha256', SECRET).update(checkString).digest('hex');
-  return hmac === hash;
-}
-
 function createTokenFor(user) {
   return jwt.sign(
-    {
-      userId: user.id,
-      telegramId: user.telegram_id
-    },
-    JWT_SECRET,
+    { userId: user.id, googleSub: user.google_sub },
+    process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
 }
 
-// Local register placeholder to avoid 404 (implement real logic as needed)
-router.post('/register', async (req, res) => {
-  return res.status(501).json({ error: 'register_not_implemented' });
-});
-
-// Local login placeholder to avoid 404 (implement real logic as needed)
-router.post('/login', async (req, res) => {
-  return res.status(501).json({ error: 'login_not_implemented' });
-});
-
-
-// Local register
 router.post('/register', async (req, res) => {
   try {
     const { username, email, password, gender, inviteCode } = req.body || {};
@@ -62,55 +25,55 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'password_too_short' });
     }
 
-    const existingEmail = await pool.query('SELECT id FROM users WHERE email = ', [email]);
-    if (existingEmail.rows.length) {
-      return res.status(400).json({ error: 'email_exists' });
-    }
-
-    const existingUsername = await pool.query('SELECT id FROM users WHERE username = ', [username]);
-    if (existingUsername.rows.length) {
+    const dupUser = await pool.query(
+      'SELECT 1 FROM users WHERE username = $1',
+      [username]
+    );
+    if (dupUser.rowCount > 0) {
       return res.status(400).json({ error: 'username_exists' });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const googleSub = local:;
+    const dupEmail = await pool.query(
+      'SELECT 1 FROM users WHERE email = $1',
+      [email]
+    );
+    if (dupEmail.rowCount > 0) {
+      return res.status(400).json({ error: 'email_exists' });
+    }
 
-    const inserted = await pool.query(
-      INSERT INTO users (username, email, password_hash, google_sub, gender, invite_code)
-       VALUES (, , , , , )
-       RETURNING *,
-      [username, email, passwordHash, googleSub, gender || null, inviteCode || null]
+    const passwordHash = await bcrypt.hash(password, 10);
+    const googleSub = `local:${username}`;
+
+    const insert = await pool.query(
+      `INSERT INTO users (username, email, password_hash, google_sub, gender, invite_code, display_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, username, email, gender, google_sub`,
+      [username, email, passwordHash, googleSub, gender || null, inviteCode || null, username]
     );
 
-    const user = inserted.rows[0];
+    const user = insert.rows[0];
     const token = createTokenFor(user);
-    return res.json({
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        gender: user.gender
-      }
-    });
+    res.json({ token, user });
   } catch (err) {
-    console.error('register error', err);
-    return res.status(500).json({ error: 'register_error' });
+    console.error(err);
+    res.status(500).json({ error: 'register_error' });
   }
 });
 
-// Local login
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body || {};
-    if (!email || !password) {
+    const { username, email, password } = req.body || {};
+    const identifier = email || username;
+    if (!identifier || !password) {
       return res.status(400).json({ error: 'missing_fields' });
     }
 
-    const result = await pool.query('SELECT * FROM users WHERE email = ', [email]);
-    const user = result.rows[0];
-    if (!user) return res.status(400).json({ error: 'invalid_credentials' });
-
+    const { rows } = await pool.query(
+      'SELECT * FROM users WHERE email = $1 OR username = $1 LIMIT 1',
+      [identifier]
+    );
+    const user = rows[0];
+    if (!user) return res.status(400).json({ error: 'user_not_found' });
     if (!user.password_hash) {
       return res.status(400).json({ error: 'google_only_account' });
     }
@@ -119,172 +82,87 @@ router.post('/login', async (req, res) => {
     if (!ok) return res.status(400).json({ error: 'invalid_credentials' });
 
     const token = createTokenFor(user);
-    return res.json({
+    res.json({
       token,
       user: {
         id: user.id,
         username: user.username,
         email: user.email,
-        gender: user.gender
+        gender: user.gender,
+        google_sub: user.google_sub
       }
     });
   } catch (err) {
-    console.error('login error', err);
-    return res.status(500).json({ error: 'login_error' });
-  }
-});
-
-
-// Telegram Login callback (Widget auth_url)
-router.get('/telegram', async (req, res) => {
-  try {
-    const {
-      hash,
-      id,
-      username,
-      first_name,
-      last_name,
-      photo_url,
-      auth_date,
-      ...extra
-    } = req.query;
-
-    if (!hash || !id || !auth_date) {
-      return redirectWithError('telegram_invalid', res);
-    }
-
-    if (!TELEGRAM_BOT_TOKEN) {
-      console.error('TELEGRAM_BOT_TOKEN is not set');
-      return redirectWithError('telegram_config', res);
-    }
-
-    const now = Math.floor(Date.now() / 1000);
-    if (now - Number(auth_date) > TELEGRAM_LOGIN_MAX_AGE) {
-      return redirectWithError('telegram_expired', res);
-    }
-
-    const data = {
-      id,
-      username,
-      first_name,
-      last_name,
-      photo_url,
-      auth_date,
-      ...extra
-    };
-
-    const dataCheckString = Object.keys(data)
-      .filter(key => data[key] !== undefined && data[key] !== null)
-      .sort()
-      .map(key => `${key}=${data[key]}`)
-      .join('\n');
-
-    const secretKey = crypto.createHash('sha256').update(TELEGRAM_BOT_TOKEN).digest();
-    const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-
-    if (hmac !== hash) {
-      console.warn('Telegram login: invalid hash');
-      return redirectWithError('telegram_invalid_hash', res);
-    }
-
-    const existing = await pool.query('SELECT * FROM users WHERE telegram_id = $1', [id]);
-    let user = existing.rows[0];
-
-    const displayName =
-      username || [first_name, last_name].filter(Boolean).join(' ') || `tg_${id}`;
-
-    if (!user) {
-      const inserted = await pool.query(
-        `INSERT INTO users (telegram_id, telegram_username, display_name, avatar_url)
-         VALUES ($1, $2, $3, $4)
-         RETURNING *`,
-        [id, username || null, displayName, photo_url || null]
-      );
-      user = inserted.rows[0];
-    } else {
-      await pool.query(
-        `UPDATE users
-           SET telegram_username = COALESCE($2, telegram_username),
-               display_name = COALESCE($3, display_name),
-               avatar_url = COALESCE($4, avatar_url)
-         WHERE id = $1`,
-        [user.id, username || null, displayName, photo_url || null]
-      );
-      const refreshed = await pool.query('SELECT * FROM users WHERE id = $1', [user.id]);
-      user = refreshed.rows[0];
-    }
-
-    const token = createTokenFor(user);
-    const successUrl = new URL('/index.html', FRONTEND_URL);
-    successUrl.searchParams.set('token', token);
-    return res.redirect(302, successUrl.toString());
-  } catch (err) {
-    console.error('Telegram auth error:', err);
-    return redirectWithError('telegram_error', res);
+    console.error(err);
+    res.status(500).json({ error: 'login_error' });
   }
 });
 
 router.post('/telegram', async (req, res) => {
   try {
-    const data = req.body || {};
+    const data = req.body;
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const maxAge = Number(process.env.TELEGRAM_LOGIN_MAX_AGE || 86400);
 
-    if (!TELEGRAM_BOT_TOKEN) {
-      return res.status(500).json({ error: 'telegram_config' });
-    }
-
-    if (!data.hash || !data.auth_date) {
+    if (!botToken) return res.status(500).json({ error: 'telegram_config' });
+    if (!data || !data.hash || !data.auth_date) {
       return res.status(400).json({ error: 'telegram_invalid' });
     }
 
-    const authDate = Number.parseInt(data.auth_date, 10);
     const now = Math.floor(Date.now() / 1000);
-    if (Number.isNaN(authDate) || now - authDate > TELEGRAM_LOGIN_MAX_AGE) {
+    if (now - Number(data.auth_date) > maxAge) {
       return res.status(400).json({ error: 'telegram_expired' });
     }
 
-    const { hash, ...checkData } = data;
-    const checkString = Object.keys(checkData)
+    const { hash, ...rest } = data;
+    const checkString = Object.keys(rest)
       .sort()
-      .map(key => `${key}=${checkData[key]}`)
+      .map(key => `${key}=${rest[key]}`)
       .join('\n');
 
-    const secret = crypto.createHash('sha256').update(TELEGRAM_BOT_TOKEN).digest();
+    const secret = crypto.createHash('sha256').update(botToken).digest();
     const hmac = crypto.createHmac('sha256', secret).update(checkString).digest('hex');
-
-    if (hmac !== hash) {
-      return res.status(400).json({ error: 'telegram_invalid_hash' });
-    }
+    if (hmac !== hash) return res.status(400).json({ error: 'telegram_invalid_hash' });
 
     const telegramId = String(data.id);
     const username = data.username || `tg_${telegramId}`;
+    const email = data.username
+      ? `${data.username}@telegram.local`
+      : `${telegramId}@telegram.local`;
+    const googleSub = `telegram:${telegramId}`;
     const displayName =
-      [data.first_name, data.last_name].filter(Boolean).join(' ') || username;
+      [data.first_name, data.last_name].filter(Boolean).join(' ') ||
+      data.username ||
+      `tg_${telegramId}`;
 
-    let user = (await pool.query('SELECT * FROM users WHERE telegram_id = $1', [telegramId]))
-      .rows[0];
+    const existing = await pool.query(
+      'SELECT * FROM users WHERE google_sub = $1 OR email = $2 LIMIT 1',
+      [googleSub, email]
+    );
 
+    let user = existing.rows[0];
     if (!user) {
-      const inserted = await pool.query(
-        `INSERT INTO users (username, telegram_id, display_name)
-         VALUES ($1, $2, $3)
-         RETURNING *`,
-        [username, telegramId, displayName]
+      const insert = await pool.query(
+        `INSERT INTO users (username, email, password_hash, google_sub, display_name, avatar_url)
+         VALUES ($1, $2, NULL, $3, $4, $5)
+         RETURNING id, username, email, gender, google_sub`,
+        [
+          username,
+          email,
+          googleSub,
+          displayName,
+          data.photo_url || null
+        ]
       );
-      user = inserted.rows[0];
+      user = insert.rows[0];
     }
 
     const token = createTokenFor(user);
-    return res.json({ token, user });
+    res.json({ token, user });
   } catch (err) {
-    console.error('Telegram auth error', err);
-    return res.status(500).json({ error: 'telegram_error' });
+    console.error(err);
+    res.status(500).json({ error: 'telegram_error' });
   }
 });
-
-function redirectWithError(code, res) {
-  const loginUrl = new URL('/login.html', FRONTEND_URL);
-  loginUrl.searchParams.set('error', code);
-  return res.redirect(302, loginUrl.toString());
-}
 
 export default router;

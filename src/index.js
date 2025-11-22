@@ -8,17 +8,24 @@ import balanceRouter from './routes/balance.js';
 import authRouter from './routes/auth.js';
 
 const app = express();
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://y1ran.app',
-    'https://www.y1ran.app'
-  ],
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
-app.options('*', cors());
+const allowlist = new Set([
+  'http://localhost:3000',
+  'https://y1ran.app',
+  'https://www.y1ran.app'
+]);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowlist.has(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
 app.use(express.json());
 
 app.get('/', (req, res) => {
