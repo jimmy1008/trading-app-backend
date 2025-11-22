@@ -38,6 +38,16 @@ function createTokenFor(user) {
   );
 }
 
+// Local register placeholder to avoid 404 (implement real logic as needed)
+router.post('/register', async (req, res) => {
+  return res.status(501).json({ error: 'register_not_implemented' });
+});
+
+// Local login placeholder to avoid 404 (implement real logic as needed)
+router.post('/login', async (req, res) => {
+  return res.status(501).json({ error: 'login_not_implemented' });
+});
+
 // Telegram Login callback (Widget auth_url)
 router.get('/telegram', async (req, res) => {
   try {
