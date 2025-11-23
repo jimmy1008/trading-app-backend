@@ -43,4 +43,29 @@ router.put('/avatar', authMiddleware, async (req, res) => {
   }
 });
 
+router.patch('/me', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { displayName } = req.body || {};
+    if (!displayName || typeof displayName !== 'string' || displayName.trim().length === 0) {
+      return res.status(400).json({ error: 'invalid_display_name' });
+    }
+    if (displayName.length > 32) {
+      return res.status(400).json({ error: 'display_name_too_long' });
+    }
+    const { rows } = await pool.query(
+      `UPDATE users
+         SET display_name = $1
+       WHERE id = $2
+       RETURNING id, username, email, display_name, google_sub, telegram_sub, avatar_url`,
+      [displayName.trim(), userId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'user_not_found' });
+    return res.json({ user: rows[0] });
+  } catch (err) {
+    console.error('update_display_name_error', err);
+    return res.status(500).json({ error: 'update_display_name_error' });
+  }
+});
+
 export default router;
