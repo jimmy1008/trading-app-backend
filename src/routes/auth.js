@@ -67,10 +67,10 @@ router.post('/register', async (req, res) => {
 
     const user = insert.rows[0];
     const token = createTokenFor(user);
-    res.json({ token, user });
+    return res.json({ token, user });
   } catch (err) {
     console.error('register_error', err);
-    res.status(500).json({ error: 'register_error', detail: err.message });
+    return res.status(500).json({ error: 'register_error', detail: err.message });
   }
 });
 
