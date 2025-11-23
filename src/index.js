@@ -5,6 +5,7 @@ import recordsRouter from './routes/records.js';
 import exchangesRouter from './routes/exchanges.js';
 import balanceRouter from './routes/balance.js';
 import authRouter from './routes/auth.js';
+import usersRouter from './routes/users.js';
 
 const app = express();
 const allowlist = new Set([
@@ -32,6 +33,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/auth', authRouter);
+app.use('/users', usersRouter);
 app.use('/records', recordsRouter);
 app.use('/exchanges', exchangesRouter);
 app.use('/balance', balanceRouter);
