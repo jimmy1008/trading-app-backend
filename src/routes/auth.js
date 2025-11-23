@@ -292,4 +292,28 @@ router.post('/bind/telegram', authRequired, async (req, res) => {
   }
 });
 
+router.get('/me', authRequired, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { rows } = await pool.query(
+      'SELECT id, username, email, gender, google_sub, telegram_sub, password_hash FROM users WHERE id = $1 LIMIT 1',
+      [userId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'user_not_found' });
+    const user = rows[0];
+    return res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      gender: user.gender,
+      google_sub: user.google_sub,
+      telegram_sub: user.telegram_sub,
+      have_password: !!user.password_hash
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'me_error' });
+  }
+});
+
 export default router;
