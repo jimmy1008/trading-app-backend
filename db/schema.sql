@@ -1,6 +1,7 @@
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   google_sub VARCHAR(100) UNIQUE NOT NULL,
+  telegram_sub VARCHAR(255),
   email VARCHAR(255) NOT NULL,
   display_name VARCHAR(255),
   avatar_url TEXT,
@@ -18,7 +19,8 @@ ALTER TABLE users
   ADD COLUMN IF NOT EXISTS gender VARCHAR(64),
   ADD COLUMN IF NOT EXISTS invite_code VARCHAR(255),
   ADD COLUMN IF NOT EXISTS avatar_url TEXT,
-  ADD COLUMN IF NOT EXISTS display_name VARCHAR(255);
+  ADD COLUMN IF NOT EXISTS display_name VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS telegram_sub VARCHAR(255);
 
 CREATE TABLE trade_records (
   id SERIAL PRIMARY KEY,
