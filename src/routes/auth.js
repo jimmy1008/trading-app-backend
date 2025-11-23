@@ -30,12 +30,13 @@ function authRequired(req, res, next) {
 router.post('/register', async (req, res) => {
   try {
     const { username, email, password, gender, inviteCode } = req.body || {};
+    const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,16}$/;
 
     if (!username || !email || !password) {
       return res.status(400).json({ error: 'missing_fields' });
     }
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'password_too_short' });
+    if (!passwordRule.test(password)) {
+      return res.status(400).json({ error: 'weak_password' });
     }
 
     const dupUser = await pool.query(
