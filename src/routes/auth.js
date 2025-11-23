@@ -29,7 +29,7 @@ function authRequired(req, res, next) {
 
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password, gender, inviteCode } = req.body || {};
+    const { username, email, password, gender, invite } = req.body || {};
     const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,16}$/;
 
     if (!username || !email || !password) {
@@ -58,16 +58,23 @@ router.post('/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const googleSub = `local:${username}`;
 
-    const insert = await pool.query(
-      `INSERT INTO users (username, email, password_hash, google_sub, gender, invite_code, display_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, username, email, gender, google_sub`,
-      [username, email, passwordHash, googleSub, gender || null, inviteCode || null, username]
-    );
-
-    const user = insert.rows[0];
-    const token = createTokenFor(user);
-    return res.json({ token, user });
+    try {
+      const insert = await pool.query(
+        `INSERT INTO users (username, email, password_hash, google_sub, gender, invite_code, display_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, username, email, gender, google_sub`,
+        [username, email, passwordHash, googleSub, gender || null, invite || null, username]
+      );
+      const user = insert.rows[0];
+      const token = createTokenFor(user);
+      return res.json({ token, user });
+    } catch (dbErr) {
+      console.error('register_db_error', dbErr);
+      return res.status(500).json({
+        error: 'db_error',
+        detail: dbErr.message
+      });
+    }
   } catch (err) {
     console.error('register_error', err);
     return res.status(500).json({ error: 'register_error', detail: err.message });
@@ -100,15 +107,21 @@ router.post('/google', async (req, res) => {
 
     const user = exist.rows[0];
 
-    if (!user || !user.google_sub || user.google_sub !== googleSub) {
+    // 沒有帳號 → 需要先註冊/綁定
+    if (!user) {
+      return res.status(400).json({ error: 'google_not_bound' });
+    }
+
+    // 有帳號但沒綁定或綁定不一致
+    if (!user.google_sub || user.google_sub !== googleSub) {
       return res.status(400).json({ error: 'google_not_bound' });
     }
 
     const token = createTokenFor(user);
-    res.json({ token, user });
+    return res.json({ token, user });
   } catch (err) {
     console.error('google_error', err);
-    res.status(500).json({ error: 'google_error', detail: err.message });
+    return res.status(500).json({ error: 'google_error' });
   }
 });
 
@@ -188,20 +201,25 @@ router.post('/telegram', async (req, res) => {
       `tg_${telegramId}`;
 
     const existing = await pool.query(
-      'SELECT * FROM users WHERE email = $1 OR telegram_sub = $2 LIMIT 1',
-      [email, telegramSub]
+      'SELECT * FROM users WHERE email = $1 LIMIT 1',
+      [email]
     );
 
+    if (existing.rowCount === 0) {
+      return res.status(400).json({ error: 'telegram_not_bound' });
+    }
+
     const user = existing.rows[0];
-    if (!user || !user.telegram_sub) {
+
+    if (!user.telegram_sub || user.telegram_sub !== telegramSub) {
       return res.status(400).json({ error: 'telegram_not_bound' });
     }
 
     const token = createTokenFor(user);
-    res.json({ token, user });
+    return res.json({ token, user });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'telegram_error' });
+    return res.status(500).json({ error: 'telegram_error' });
   }
 });
 
