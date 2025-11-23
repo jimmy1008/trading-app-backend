@@ -296,7 +296,7 @@ router.get('/me', authRequired, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { rows } = await pool.query(
-      'SELECT id, username, email, gender, google_sub, telegram_sub, password_hash FROM users WHERE id = $1 LIMIT 1',
+      'SELECT id, username, email, gender, google_sub, telegram_sub, password_hash, avatar_url FROM users WHERE id = $1 LIMIT 1',
       [userId]
     );
     if (!rows.length) return res.status(404).json({ error: 'user_not_found' });
@@ -308,6 +308,7 @@ router.get('/me', authRequired, async (req, res) => {
       gender: user.gender,
       google_sub: user.google_sub,
       telegram_sub: user.telegram_sub,
+      avatar_url: user.avatar_url,
       have_password: !!user.password_hash
     });
   } catch (err) {
