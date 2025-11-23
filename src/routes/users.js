@@ -69,3 +69,26 @@ router.patch('/me', authMiddleware, async (req, res) => {
 });
 
 export default router;
+
+// 兼容舊版 /users/update（更新暱稱）
+router.post('/update', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { display_name } = req.body || {};
+    const name = typeof display_name === 'string' ? display_name.trim() : '';
+    if (!name) return res.status(400).json({ error: 'invalid_display_name' });
+    if (name.length > 32) return res.status(400).json({ error: 'display_name_too_long' });
+    const { rows } = await pool.query(
+      `UPDATE users
+         SET display_name = $1
+       WHERE id = $2
+       RETURNING id, username, email, display_name, google_sub, telegram_sub, avatar_url`,
+      [name, userId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'user_not_found' });
+    return res.json({ user: rows[0] });
+  } catch (err) {
+    console.error('users_update_error', err);
+    return res.status(500).json({ error: 'users_update_error' });
+  }
+});

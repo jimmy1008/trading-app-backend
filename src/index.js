@@ -14,6 +14,14 @@ const allowlist = new Set([
   'https://www.y1ran.app'
 ]);
 
+// 強制 UTF-8 輸出，避免缺少 charset 造成亂碼
+app.use((req, res, next) => {
+  if (!res.getHeader('Content-Type')) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && allowlist.has(origin)) {
