@@ -41,6 +41,51 @@ app.get('/', (req, res) => {
   res.json({ ok: true });
 });
 
+// 臨時假資料：資產
+app.get('/portfolio', (req, res) => {
+  return res.json({
+    status: 'ok',
+    data: [
+      { time: '2025-01-01', value: 1000 },
+      { time: '2025-01-02', value: 1030 },
+      { time: '2025-01-03', value: 980 },
+      { time: '2025-01-04', value: 1100 }
+    ],
+    // 兼容前端期待 positions 結構
+    positions: [
+      { symbol: 'BTC', value_usdt: 500 },
+      { symbol: 'ETH', value_usdt: 300 },
+      { symbol: 'SOL', value_usdt: 200 }
+    ]
+  });
+});
+
+// 臨時假資料：交易所列表
+app.get('/exchanges', (req, res, next) => {
+  // 若後續要交給實際路由，可刪除或改寫
+  return res.json({
+    status: 'ok',
+    exchanges: [
+      'binance',
+      'bybit',
+      'bitget',
+      'okx',
+      'bingx',
+      'mexc',
+      'gate'
+    ],
+    list: [
+      { code: 'binance', name: 'Binance' },
+      { code: 'bybit', name: 'Bybit' },
+      { code: 'bitget', name: 'Bitget' },
+      { code: 'okx', name: 'OKX' },
+      { code: 'bingx', name: 'BingX' },
+      { code: 'mexc', name: 'MEXC' },
+      { code: 'gate', name: 'Gate.io' }
+    ]
+  });
+});
+
 app.use('/auth', authRouter);
 app.use('/users', usersRouter);
 app.use('/records', recordsRouter);
