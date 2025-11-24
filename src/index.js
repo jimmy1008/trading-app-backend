@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import cors from 'cors';
 import recordsRouter from './routes/records.js';
 import exchangesRouter from './routes/exchanges.js';
 import balanceRouter from './routes/balance.js';
@@ -8,7 +9,7 @@ import usersRouter from './routes/users.js';
 
 const app = express();
 
-// 強制 UTF-8 輸出，避免缺少 charset 造成亂碼，並停用壓縮編碼
+// 強制 UTF-8 輸出，並避免重複壓縮
 app.use((req, res, next) => {
   if (!res.getHeader('Content-Type')) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -17,20 +18,19 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
-  next();
-});
+// CORS：允許本地與正式網域
+app.use(cors({
+  origin: ['http://localhost:3000', 'https://y1ran.app', 'https://www.y1ran.app'],
+  credentials: true
+}));
+
 app.use(express.json());
 
 app.get('/', (req, res) => {
   res.json({ ok: true });
 });
 
-// 臨時假資料：資產
+// 假資料 Portfolio
 app.get('/portfolio', (req, res) => {
   return res.json({
     status: 'ok',
@@ -40,7 +40,6 @@ app.get('/portfolio', (req, res) => {
       { time: '2025-01-03', value: 980 },
       { time: '2025-01-04', value: 1100 }
     ],
-    // 兼容前端期待 positions 結構
     positions: [
       { symbol: 'BTC', value_usdt: 500 },
       { symbol: 'ETH', value_usdt: 300 },
@@ -49,20 +48,11 @@ app.get('/portfolio', (req, res) => {
   });
 });
 
-// 臨時假資料：交易所列表
-app.get('/exchanges', (req, res, next) => {
-  // 若後續要交給實際路由，可刪除或改寫
+// 假資料 Exchanges
+app.get('/exchanges', (req, res) => {
   return res.json({
     status: 'ok',
-    exchanges: [
-      'binance',
-      'bybit',
-      'bitget',
-      'okx',
-      'bingx',
-      'mexc',
-      'gate'
-    ],
+    exchanges: ['binance', 'bybit', 'bitget', 'okx', 'bingx', 'mexc', 'gate'],
     list: [
       { code: 'binance', name: 'Binance' },
       { code: 'bybit', name: 'Bybit' },
