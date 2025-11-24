@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import express from 'express';
-import cors from 'cors';
 import recordsRouter from './routes/records.js';
 import exchangesRouter from './routes/exchanges.js';
 import balanceRouter from './routes/balance.js';
@@ -8,11 +7,6 @@ import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
 
 const app = express();
-const allowlist = new Set([
-  'http://localhost:3000',
-  'https://y1ran.app',
-  'https://www.y1ran.app'
-]);
 
 // 強制 UTF-8 輸出，避免缺少 charset 造成亂碼，並停用壓縮編碼
 app.use((req, res, next) => {
@@ -24,12 +18,7 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && allowlist.has(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Vary', 'Origin');
-  }
-  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
