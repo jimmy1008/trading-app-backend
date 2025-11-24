@@ -18,9 +18,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS：允許本地與正式網域
+// CORS：允許正式網域與本機
 app.use(cors({
   origin: ['http://localhost:3000', 'https://y1ran.app', 'https://www.y1ran.app'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 
@@ -28,6 +30,46 @@ app.use(express.json());
 
 app.get('/', (req, res) => {
   res.json({ ok: true });
+});
+
+// ===============================
+// Fake Records API （暫時讓前端不報錯）
+// ===============================
+let records = [
+  {
+    id: 1,
+    symbol: 'BTC',
+    side: 'long',
+    result: 'win',
+    profit: 150,
+    traded_at: Date.now()
+  }
+];
+
+// 取得全部紀錄
+app.get('/records', (req, res) => {
+  res.json({ status: 'ok', data: records });
+});
+
+// 新增紀錄
+app.post('/records', (req, res) => {
+  const newRec = { id: Date.now(), ...req.body };
+  records.push(newRec);
+  res.json({ status: 'ok', data: newRec });
+});
+
+// 更新紀錄
+app.put('/records/:id', (req, res) => {
+  const id = Number(req.params.id);
+  records = records.map((r) => (r.id === id ? { ...r, ...req.body } : r));
+  res.json({ status: 'ok' });
+});
+
+// 刪除紀錄
+app.delete('/records/:id', (req, res) => {
+  const id = Number(req.params.id);
+  records = records.filter((r) => r.id !== id);
+  res.json({ status: 'ok' });
 });
 
 // 假資料 Portfolio
